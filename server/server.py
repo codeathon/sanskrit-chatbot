@@ -15,6 +15,7 @@ import json
 import pickle
 import re
 import math
+import signal
 from datetime import datetime, timezone
 import urllib.request
 import urllib.parse
@@ -645,4 +646,21 @@ if __name__ == '__main__':
             print('  WARNING: OPENAI_API_KEY is empty — chat will fail until set.\n')
     elif not ANTHROPIC_API_KEY:
         print('  WARNING: ANTHROPIC_API_KEY is empty — chat will fail until set.\n')
-    server.serve_forever()
+
+    # Ctrl+C (SIGINT) / SIGTERM: stop serve_forever and release the socket cleanly.
+    def _graceful_shutdown():
+        print('\n  Shutting down…', flush=True)
+        server.shutdown()
+
+    def _on_stop_signal(signum, frame):
+        threading.Thread(target=_graceful_shutdown, daemon=True).start()
+
+    signal.signal(signal.SIGINT, _on_stop_signal)
+    if hasattr(signal, 'SIGTERM'):
+        signal.signal(signal.SIGTERM, _on_stop_signal)
+
+    try:
+        server.serve_forever()
+    finally:
+        server.server_close()
+        print('  Server stopped.', flush=True)

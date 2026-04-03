@@ -25,3 +25,7 @@ node_modules/
 # Corpus files in data/ stay local; the folder is tracked via data/.gitkeep only.
 data/*
 !data/.gitkeep
+
+# Built index + KB JSON from ingest; regenerate with python3 ingest.py
+knowledge-base/*
+!knowledge-base/.gitkeep

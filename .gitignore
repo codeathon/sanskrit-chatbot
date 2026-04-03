@@ -21,3 +21,6 @@ venv/
 
 # Node (if used)
 node_modules/
+
+# Corpus / local documents for ingest (do not commit large or licensed files)
+data/

@@ -1,0 +1,15 @@
+{
+  "name": "sanskrit-chatbot",
+  "version": "1.0.0",
+  "description": "Sanskrit/Yoga Knowledge Chatbot - Client/Server application with RAG",
+  "main": "server/server.js",
+  "scripts": {
+    "train": "node server/train.js",
+    "start": "node server/server.js",
+    "setup": "npm install && node server/train.js && echo '\n✅ Setup complete! Run: npm start\n'"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.18.2"
+  }
+}

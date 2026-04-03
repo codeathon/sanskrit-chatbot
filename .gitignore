@@ -22,5 +22,6 @@ venv/
 # Node (if used)
 node_modules/
 
-# Corpus / local documents for ingest (do not commit large or licensed files)
-data/
+# Corpus files in data/ stay local; the folder is tracked via data/.gitkeep only.
+data/*
+!data/.gitkeep

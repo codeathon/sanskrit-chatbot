@@ -15,8 +15,7 @@ __pycache__/
 .env.*
 !.env.example
 
-# Local virtualenv — recreate with: python3 -m venv venv && pip install -r requirements.txt
-# This repo may still have venv/ tracked from an older commit; new clones can ignore it here.
+# Local virtualenv — python3 -m venv venv && pip install -r requirements.txt
 venv/
 .venv/
 

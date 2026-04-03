@@ -204,26 +204,37 @@ function mkAssistant(){
   showChat();
   const m=document.getElementById('msgs'),d=document.createElement('div');
   d.className='msg assistant';
+  // No duplicate ids — each bubble must be updated via refs below (getElementById would always hit the first message).
   d.innerHTML=`
     <div class="av">ॐ</div>
     <div class="mc">
-      <div class="tb" id="tb" style="display:none">
-        <div class="th" onclick="toggleT()">
-          <div class="td" id="tdot"></div>
-          <span id="tlbl">Thinking…</span>
-          <span class="tt" id="ttgl">▼</span>
+      <div class="tb" style="display:none">
+        <div class="th" onclick="toggleThinking(this)">
+          <div class="td"></div>
+          <span class="a-lbl">Thinking…</span>
+          <span class="tt">▼</span>
         </div>
-        <div class="tby" id="tby"></div>
+        <div class="tby"></div>
       </div>
-      <div class="mb"><div class="at" id="at"></div></div>
-      <div class="msrc" id="msrc" style="display:none"></div>
+      <div class="mb"><div class="at"></div></div>
+      <div class="msrc" style="display:none"></div>
     </div>`;
   m.appendChild(d);scrollB();
+  return {
+    tb: d.querySelector('.tb'),
+    tdot: d.querySelector('.td'),
+    tlbl: d.querySelector('.a-lbl'),
+    tby: d.querySelector('.tby'),
+    at: d.querySelector('.mb .at'),
+    msrc: d.querySelector('.msrc')
+  };
 }
 
-function toggleT(){
-  document.getElementById('tby').classList.toggle('hidden');
-  document.getElementById('ttgl').classList.toggle('closed');
+function toggleThinking(th){
+  const mc=th.closest('.mc');
+  if(!mc)return;
+  mc.querySelector('.tby').classList.toggle('hidden');
+  mc.querySelector('.th .tt').classList.toggle('closed');
 }
 
 async function send(){
@@ -239,10 +250,7 @@ async function send(){
   hist.push({role:'user',content:msg});
   streaming=true;document.getElementById('sb').disabled=true;
 
-  mkAssistant();
-  const tb=document.getElementById('tb'),tdot=document.getElementById('tdot'),
-        tlbl=document.getElementById('tlbl'),tby=document.getElementById('tby'),
-        at=document.getElementById('at'),msrc=document.getElementById('msrc');
+  const {tb,tdot,tlbl,tby,at,msrc}=mkAssistant();
 
   const cur=document.createElement('span');cur.className='cur';at.appendChild(cur);
 

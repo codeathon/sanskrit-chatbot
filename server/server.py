@@ -6,6 +6,8 @@ and the complete Rig Veda database.
 LLM: default Anthropic (Claude). OpenAI-compatible option:
   LLM_PROVIDER=openai OPENAI_API_KEY=sk-... python3 server/server.py
   Optional: OPENAI_MODEL=gpt-4o-mini OPENAI_BASE_URL=https://api.openai.com/v1
+KB-only (skip LLM): VEDAGPT_KB_ONLY=1
+On API failure (e.g. low credits), chat falls back to the same retrieval text automatically.
 """
 
 import os
@@ -30,6 +32,8 @@ KB_PATH    = os.path.join(KB_DIR, 'knowledge_base.json')
 
 # Set VEDAGPT_CHAT_LOG=0 to silence [VedaGPT chat] lines on stdout.
 CHAT_LOG_STDOUT = os.environ.get('VEDAGPT_CHAT_LOG', '1').strip() not in ('0', 'false', 'no')
+# If set, never call the LLM; chat returns formatted search hits only.
+KB_ONLY_MODE = os.environ.get('VEDAGPT_KB_ONLY', '').strip().lower() in ('1', 'true', 'yes')
 
 
 def chat_log(msg):
@@ -317,6 +321,70 @@ USER QUERY: {query}
 
 Please answer using ONLY the information in the retrieved context above. If the context doesn't contain enough information, say so clearly."""
 
+
+def write_sse_text_chunks(wfile, text, reply_parts, chunk_size=400):
+    """Emit text as type:text SSE events; accumulate into reply_parts for logging."""
+    for i in range(0, len(text), chunk_size):
+        chunk = text[i:i + chunk_size]
+        reply_parts.append(chunk)
+        out = json.dumps({'type': 'text', 'text': chunk}, ensure_ascii=False)
+        wfile.write(f'data: {out}\n\n'.encode('utf-8'))
+        wfile.flush()
+
+
+def format_kb_only_reply(query, results, api_error=None, kb_only_preface=False):
+    """
+    Readable fallback when the LLM is off or the API failed (credits, network, etc.).
+    """
+    lines = []
+    if kb_only_preface:
+        lines.append(
+            '**Knowledge base only** — VEDAGPT_KB_ONLY is set; the language model is not called.\n'
+        )
+    elif api_error is not None:
+        brief = str(api_error)
+        if len(brief) > 300:
+            brief = brief[:300] + '…'
+        lines.append(
+            '**Model unavailable** (quota, credits, network, or configuration). '
+            'Below are retrieval results from the indexed knowledge base only.\n'
+        )
+        lines.append(f'_Diagnostic:_ {brief}\n')
+    lines.append('')
+    if not results:
+        lines.append(
+            'No passages matched your query. Try different keywords (English or transliterated Sanskrit).'
+        )
+        return '\n'.join(lines)
+    lines.append(f'Top matches for: _{query}_\n')
+    for idx, (score, doc) in enumerate(results[:8], 1):
+        src = doc['source'].replace('_', ' ')
+        if doc['type'] == 'mantra':
+            md = doc.get('mantra_data', {})
+            dev = md.get('mantra_devanagari', '') or ''
+            lines.append(
+                f'### {idx}. Rig Veda {md.get("mandala")}.{md.get("sukta")}.{md.get("verse")} '
+                f'(score {score:.3f})'
+            )
+            lines.append(f'- **Devata:** {md.get("devata", "")}')
+            if dev:
+                tail = '…' if len(dev) > 220 else ''
+                lines.append(f'- **Devanagari:** {dev[:220]}{tail}')
+            tr = (md.get('transliteration') or '').strip()
+            if tr:
+                ttail = '…' if len(tr) > 220 else ''
+                lines.append(f'- **Transliteration:** {tr[:220]}{ttail}')
+        else:
+            body = doc.get('text') or ''
+            preview = body[:1200]
+            ell = '…' if len(body) > 1200 else ''
+            lines.append(f'### {idx}. {src} (score {score:.3f})')
+            lines.append('')
+            lines.append(preview + ell)
+        lines.append('')
+    return '\n'.join(lines).strip() + '\n'
+
+
 # ── HTTP Handler ───────────────────────────────────────────────────────────────
 class VedaGPTHandler(BaseHTTPRequestHandler):
     
@@ -485,7 +553,12 @@ class VedaGPTHandler(BaseHTTPRequestHandler):
             reply_parts = []
 
             try:
-                if LLM_PROVIDER == 'openai':
+                if KB_ONLY_MODE:
+                    fb = format_kb_only_reply(
+                        query, results, api_error=None, kb_only_preface=True
+                    )
+                    write_sse_text_chunks(self.wfile, fb, reply_parts)
+                elif LLM_PROVIDER == 'openai':
                     oa_msgs = [{'role': 'system', 'content': SYSTEM_PROMPT}] + messages
                     response = call_openai_api(oa_msgs, stream=True)
                     for text in iter_openai_stream_text(response):
@@ -502,15 +575,20 @@ class VedaGPTHandler(BaseHTTPRequestHandler):
                         self.wfile.flush()
             except Exception as e:
                 chat_log(f'[VedaGPT chat] ERROR: {e}')
-                err_out = json.dumps({'type': 'error', 'error': str(e)})
-                self.wfile.write(f"data: {err_out}\n\n".encode('utf-8'))
+                fb = format_kb_only_reply(
+                    query, results, api_error=e, kb_only_preface=False
+                )
+                write_sse_text_chunks(self.wfile, fb, reply_parts)
 
             full_reply = ''.join(reply_parts)
             preview = full_reply if len(full_reply) <= 1200 else full_reply[:1200] + '…'
-            chat_log(
-                f'[VedaGPT chat] reply ({len(full_reply)} chars): '
-                f'{preview if preview else "(empty — check API key, model, or stream format)"}'
-            )
+            if KB_ONLY_MODE:
+                chat_log(f'[VedaGPT chat] KB-only reply ({len(full_reply)} chars)')
+            else:
+                chat_log(
+                    f'[VedaGPT chat] reply ({len(full_reply)} chars): '
+                    f'{preview if preview else "(empty — check API key, model, or stream format)"}'
+                )
 
             done_out = json.dumps({'type': 'done'})
             self.wfile.write(f"data: {done_out}\n\n".encode('utf-8'))
@@ -518,7 +596,11 @@ class VedaGPTHandler(BaseHTTPRequestHandler):
         else:
             # Non-streaming fallback
             try:
-                if LLM_PROVIDER == 'openai':
+                if KB_ONLY_MODE:
+                    text = format_kb_only_reply(
+                        query, results, api_error=None, kb_only_preface=True
+                    )
+                elif LLM_PROVIDER == 'openai':
                     oa_msgs = [{'role': 'system', 'content': SYSTEM_PROMPT}] + messages
                     resp = call_openai_api(oa_msgs, stream=False)
                     result = json.loads(resp.read().decode('utf-8'))
@@ -529,14 +611,19 @@ class VedaGPTHandler(BaseHTTPRequestHandler):
                     text = result['content'][0]['text']
                 self.send_json({'response': text, 'sources': sources_info})
             except Exception as e:
-                self.send_json({'error': str(e)}, 500)
+                text = format_kb_only_reply(
+                    query, results, api_error=e, kb_only_preface=False
+                )
+                self.send_json({'response': text, 'sources': sources_info, 'fallback': True})
 
 
 # ── Main ───────────────────────────────────────────────────────────────────────
 if __name__ == '__main__':
     PORT = int(os.environ.get('PORT', 8000))
     server = HTTPServer(('0.0.0.0', PORT), VedaGPTHandler)
-    if LLM_PROVIDER == 'openai':
+    if KB_ONLY_MODE:
+        _prov_line = 'KB-only (no LLM)'
+    elif LLM_PROVIDER == 'openai':
         _prov_line = f'openai · {OPENAI_MODEL}'
     else:
         _prov_line = f'anthropic · {ANTHROPIC_MODEL}'
@@ -550,7 +637,9 @@ if __name__ == '__main__':
 ║  Sources:   Vol.14, Vol.15, Vol.16 + RV Database          ║
 ╚══════════════════════════════════════════════════════════╝
     """)
-    if LLM_PROVIDER == 'openai':
+    if KB_ONLY_MODE:
+        print('  VEDAGPT_KB_ONLY=1 — chat never calls the LLM; retrieval text only.\n')
+    elif LLM_PROVIDER == 'openai':
         print(f'  OPENAI_BASE_URL={OPENAI_BASE_URL}')
         if not OPENAI_API_KEY:
             print('  WARNING: OPENAI_API_KEY is empty — chat will fail until set.\n')

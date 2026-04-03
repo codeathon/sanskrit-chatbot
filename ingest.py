@@ -8,8 +8,10 @@ Usage:
 
 Supported in ./data/ (any names, any count):
   .docx  — full text chunked for search
-  .xlsx  — if a sheet named "RV Database" exists, rows are ingested as mantra docs
-           (same column layout as the legacy VedaGPT blueprint). Other sheets are
+  .xlsx  — if a sheet named "RV Database" exists, rows are ingested as mantra docs.
+           Columns B, C, D (Excel) = mandala, sukta, verse; a composite index key
+           "B.C.D" (e.g. 1.1.1) is stored as composite_key and used in doc ids and text.
+           Other sheets are
            turned into plain text rows and chunked, except names listed in
            VEDAGPT_SKIP_XLSX_SHEETS (default skips tab "Website Design", which is
            not corpus text — it lives inside the .xlsx, not a separate .docx file).
@@ -185,9 +187,33 @@ def sheet_to_plain_text(ws):
     return '\n'.join(lines).strip()
 
 
+def _xlsx_bcd_part(cell):
+    """
+    Normalize one Excel cell for mandala / sukta / verse (columns B, C, D).
+    Int-like floats from spreadsheets become string integers (e.g. 1.0 → '1').
+    """
+    if cell is None:
+        return ''
+    if isinstance(cell, float):
+        if cell != cell:  # NaN
+            return ''
+        if cell == int(cell):
+            return str(int(cell))
+    return str(cell).strip()
+
+
+def _composite_key_bcd(row):
+    """Build composite index key from columns B, C, D (indices 1,2,3), e.g. '1.1.1'."""
+    b, c, d = _xlsx_bcd_part(row[1]), _xlsx_bcd_part(row[2]), _xlsx_bcd_part(row[3])
+    if not (b and c and d):
+        return ''
+    return f'{b}.{c}.{d}'
+
+
 def ingest_rv_database_sheet(ws, file_base, fname, all_docs, source_meta):
     """
-    Legacy VedaGPT blueprint layout: columns 0–14, Devanagari in column 12.
+    Legacy VedaGPT blueprint layout: column A mantra #, B–D mandala/sukta/verse,
+    Devanagari in column M (index 12). composite_key = B.C.D for stable indexing.
     """
     rows = list(ws.iter_rows(values_only=True))
     if len(rows) < 2:
@@ -197,12 +223,20 @@ def ingest_rv_database_sheet(ws, file_base, fname, all_docs, source_meta):
     for row in rows[1:]:
         if row[0] is None or not row[12]:
             continue
+        mandala = _xlsx_bcd_part(row[1])
+        sukta = _xlsx_bcd_part(row[2])
+        verse = _xlsx_bcd_part(row[3])
+        composite_key = _composite_key_bcd(row)
         mantra_devanagari = str(row[12])
         devata = str(row[9]) if row[9] else ''
         transliteration = str(row[14]) if row[14] else ''
         md = {
-            'mantra_number': row[0], 'mandala': row[1],
-            'sukta': row[2], 'verse': row[3],
+            'mantra_number': row[0],
+            # Columns B, C, D (normalized strings for search and display)
+            'mandala': mandala,
+            'sukta': sukta,
+            'verse': verse,
+            'composite_key': composite_key,
             'devata': devata, 'chhandas': str(row[10]) if row[10] else '',
             'mantra_devanagari': mantra_devanagari,
             'pada_patha': str(row[13]) if row[13] else '',
@@ -211,9 +245,16 @@ def ingest_rv_database_sheet(ws, file_base, fname, all_docs, source_meta):
             'page_vol14': str(row[6]) if row[6] else '',
             'page_vol16': str(row[7]) if row[7] else '',
         }
-        text = (f"Rig Veda {row[1]}.{row[2]}.{row[3]}: {mantra_devanagari} "
+        # Reference line uses composite B.C.D when present (same as a virtual index column).
+        ref = composite_key if composite_key else f'{row[1]}.{row[2]}.{row[3]}'
+        text = (f"Rig Veda {ref}: {mantra_devanagari} "
                 f"Devata: {devata} Transliteration: {transliteration}")
-        rid = f"{src}_{row[0]}"
+        # Document id keyed by composite B.C.D; fallback to mantra_number (column A)
+        if composite_key:
+            rid = f"{src}_{composite_key}" #.replace('.', '_')}"
+            print(rid)
+        else:
+            rid = f"{src}_{row[0]}"
         doc = {'id': rid, 'source': src, 'type': 'mantra', 'text': text, 'mantra_data': md}
         rv_mantras.append(doc)
     if not rv_mantras:

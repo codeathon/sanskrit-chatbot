@@ -4,7 +4,17 @@ A **web chat assistant** that answers from a **fixed knowledge base** built from
 
 **In short:** ingest documents from `data/`, search them at query time, and chat in the browser with answers grounded in that corpus.
 
-**Layout:** the browser UI lives under **`src/client/`**; the Python and Node servers live under **`src/server/`** (`server.py`, `server.js`, `train.js`). Run commands from the **project root** (where `ingest.py` is).
+**Layout:** the browser UI lives under **`src/client/`**; the Python and Node servers live under **`src/server/`** (`server.py`, `retrieval.py`, `server.js`, `train.js`). Run commands from the **project root** (where `ingest.py` is).
+
+## Tests
+
+Server-side **retrieval and KB-only formatting** (TF–IDF search, Rig Veda `M.S.V` key handling, `format_kb_only_reply`, RAG prompt building) live in **`src/server/retrieval.py`** and are covered by unit tests under **`test/`**. They do not call the Claude or OpenAI APIs.
+
+From the project root:
+
+```bash
+python3 -m unittest discover -s test -v
+```
 
 ## Adding data
 

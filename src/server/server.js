@@ -12,21 +12,21 @@ const fs = require('fs');
 
 const app = express();
 const PORT = process.env.PORT ? Number(process.env.PORT) : 3456;
-// Claude only (same defaults as server/server.py).
+// Claude only (same defaults as src/server/server.py).
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || '';
 const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6';
 
 app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname, '../client')));
+app.use(express.static(path.join(__dirname, '../client'))); // sibling: src/client
 
-// Load knowledge base from disk
-const KB_PATH = path.join(__dirname, '../knowledge-base/knowledge_base.json');
+// Load knowledge base from disk (repo root)
+const KB_PATH = path.join(__dirname, '../../knowledge-base/knowledge_base.json');
 let knowledgeBase = null;
 
 function loadKnowledgeBase() {
   if (!fs.existsSync(KB_PATH)) {
-    console.error('❌ Knowledge base not found! Please run: node server/train.js');
+    console.error('❌ Knowledge base not found! Please run: node src/server/train.js');
     process.exit(1);
   }
   knowledgeBase = JSON.parse(fs.readFileSync(KB_PATH, 'utf8'));

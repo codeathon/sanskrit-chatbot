@@ -8,8 +8,8 @@
 const fs = require('fs');
 const path = require('path');
 
-const DATA_DIR = path.join(__dirname, '../data');
-const KB_PATH = path.join(__dirname, '../knowledge-base/knowledge_base.json');
+const DATA_DIR = path.join(__dirname, '../../data');
+const KB_PATH = path.join(__dirname, '../../knowledge-base/knowledge_base.json');
 
 console.log('📚 Starting knowledge base construction...\n');
 
@@ -153,4 +153,4 @@ console.log(`   📄 Documents processed: ${knowledgeBase.totalDocuments}`);
 console.log(`   🔍 Total chunks indexed: ${knowledgeBase.allChunks.length}`);
 console.log(`   🗝️  Unique keywords: ${Object.keys(keywordIndex).length}`);
 console.log(`   💾 Saved to: ${KB_PATH}`);
-console.log('\nRun `node server/server.js` to start the chatbot server.\n');
+console.log('\nRun `node src/server/server.js` to start the chatbot server.\n');

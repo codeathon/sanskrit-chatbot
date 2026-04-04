@@ -4,7 +4,7 @@ A chatbot server grounded in Sri Aurobindo's Complete Works (Vol 14, 15, 16)
 and the complete Rig Veda database.
 
 LLM: default Anthropic (Claude). OpenAI-compatible option:
-  LLM_PROVIDER=openai OPENAI_API_KEY=sk-... python3 server/server.py
+  LLM_PROVIDER=openai OPENAI_API_KEY=sk-... python3 src/server/server.py
   Optional: OPENAI_MODEL=gpt-4o-mini OPENAI_BASE_URL=https://api.openai.com/v1
 KB-only (skip LLM): VEDAGPT_KB_ONLY=1
 On API failure (e.g. low credits), chat falls back to the same retrieval text automatically.
@@ -26,7 +26,8 @@ from collections import Counter
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
 # ── Paths ──────────────────────────────────────────────────────────────────────
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# __file__ = .../src/server/server.py → repo root is two levels up.
+BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 KB_DIR   = os.path.join(BASE_DIR, 'knowledge-base')
 INDEX_PATH = os.path.join(KB_DIR, 'search_index.pkl')
 KB_PATH    = os.path.join(KB_DIR, 'knowledge_base.json')
@@ -532,7 +533,7 @@ class VedaGPTHandler(BaseHTTPRequestHandler):
     
     def do_GET(self):
         if self.path == '/':
-            self.serve_file(os.path.join(BASE_DIR, 'client', 'index.html'), 'text/html')
+            self.serve_file(os.path.join(BASE_DIR, 'src', 'client', 'index.html'), 'text/html')
         elif self.path == '/health':
             self.send_json({'status': 'ok', 'docs': len(ALL_DOCS)})
         elif self.path == '/api/info':
@@ -555,7 +556,7 @@ class VedaGPTHandler(BaseHTTPRequestHandler):
             self.end_headers()
     
     def handle_kb_info(self):
-        """JSON shape expected by client/index.html (Knowledge Base sidebar)."""
+        """JSON shape expected by src/client/index.html (Knowledge Base sidebar)."""
         try:
             with open(KB_PATH, 'r', encoding='utf-8') as f:
                 kb = json.load(f)

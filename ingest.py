@@ -252,7 +252,6 @@ def ingest_rv_database_sheet(ws, file_base, fname, all_docs, source_meta):
         # Document id keyed by composite B.C.D; fallback to mantra_number (column A)
         if composite_key:
             rid = f"{src}_{composite_key}" #.replace('.', '_')}"
-            print(rid)
         else:
             rid = f"{src}_{row[0]}"
         doc = {'id': rid, 'source': src, 'type': 'mantra', 'text': text, 'mantra_data': md}
@@ -370,7 +369,7 @@ def main():
     size = os.path.getsize(os.path.join(KB_DIR, 'search_index.pkl')) / (1024 * 1024)
     print(f"  search_index.pkl — {size:.1f} MB")
     print("  knowledge_base.json — saved")
-    print("\n✅ Ingestion complete! Run: python3 server/server.py")
+    print("\n✅ Ingestion complete! Run: python3 src/server/server.py")
 
 
 if __name__ == '__main__':

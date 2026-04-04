@@ -298,7 +298,7 @@ async function send(){
             }else if(ev.delta?.type==='text_delta'){
               full+=ev.delta.text||'';at.textContent=full;at.appendChild(cur);scrollB();
             }
-          // Server forwards plain chunks as type "text" (see server.py handle_chat).
+          // Server forwards plain chunks as type "text" (see src/server/server.py handle_chat).
           }else if(ev.type==='text'&&typeof ev.text==='string'&&ev.text){
             full+=ev.text;at.textContent=full;at.appendChild(cur);scrollB();
           }else if(ev.type==='error'){

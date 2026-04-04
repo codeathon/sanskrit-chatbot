@@ -4,6 +4,8 @@ A **web chat assistant** that answers from a **fixed knowledge base** built from
 
 **In short:** ingest documents from `data/`, search them at query time, and chat in the browser with answers grounded in that corpus.
 
+**Layout:** the browser UI lives under **`src/client/`**; the Python and Node servers live under **`src/server/`** (`server.py`, `server.js`, `train.js`). Run commands from the **project root** (where `ingest.py` is).
+
 ## Adding data
 
 1. Put files in the **`data/`** folder at the project root (same level as `ingest.py`). Only **files directly in `data/`** are scanned; subfolders are ignored.
@@ -42,7 +44,7 @@ From the **project root**:
 ```bash
 source venv/bin/activate    # if you use the venv from above; Windows: venv\Scripts\activate
 export ANTHROPIC_API_KEY='sk-ant-...'   # required for Claude unless using KB-only or OpenAI
-python3 server/server.py
+python3 src/server/server.py
 ```
 
 Open **http://localhost:8000/** in a browser (static UI + API on the same port).
@@ -57,8 +59,8 @@ Open **http://localhost:8000/** in a browser (static UI + API on the same port).
 | `VEDAGPT_KB_ONLY` | Set to **`1`** to never call an LLM; chat returns retrieval text only. |
 | `VEDAGPT_CHAT_LOG` | Set to **`0`** to silence extra chat logs on the terminal. |
 
-The server uses only the **Python standard library** for HTTP; no extra pip packages are required for **`server/server.py`** itself (ingest still needs **`requirements.txt`**).
+The server uses only the **Python standard library** for HTTP; no extra pip packages are required for **`src/server/server.py`** itself (ingest still needs **`requirements.txt`**).
 
 **Stop:** **Ctrl+C** triggers a clean shutdown and releases the port.
 
-**Alternate stack:** a Node/Express server lives under **`server/server.js`** (different port and knowledge-base shape); the flow above is the supported Python path.
+**Alternate stack:** a Node/Express server lives under **`src/server/server.js`** (different port and knowledge-base shape); the flow above is the supported Python path.
